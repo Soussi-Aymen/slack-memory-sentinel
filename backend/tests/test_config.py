@@ -33,3 +33,21 @@ def test_configure_cognee_is_safely_callable_twice(monkeypatch):
     configure_cognee()
     configure_cognee()
     assert config_mod._adapter_registered is True
+
+    from cognee.infrastructure.databases.vector.config import get_vectordb_config
+
+    vector_cfg = get_vectordb_config()
+    assert vector_cfg.vector_db_provider == "qdrant"
+    assert vector_cfg.vector_dataset_database_handler == "qdrant"
+
+
+def test_configure_cognee_forwards_openai_key_to_cognee(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-live-not-a-placeholder")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    configure_cognee()
+
+    from cognee.infrastructure.databases.vector.embeddings.config import get_embedding_config
+    from cognee.infrastructure.llm.config import get_llm_config
+
+    assert get_llm_config().llm_api_key == "sk-live-not-a-placeholder"
+    assert get_embedding_config().embedding_api_key == "sk-live-not-a-placeholder"
