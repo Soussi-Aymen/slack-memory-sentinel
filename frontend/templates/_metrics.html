@@ -1,0 +1,25 @@
+<div class="metrics" hx-get="/metrics" hx-trigger="every 2s" hx-swap="outerHTML">
+  <dl>
+    <div><dt>Total</dt><dd>{{ snap.total_cost_usd | usd }}</dd></div>
+    <div><dt>Tokens in / out</dt><dd>{{ snap.tokens_in }} / {{ snap.tokens_out }}</dd></div>
+    <div><dt>p50 latency</dt><dd>{{ "%.0f"|format(snap.p50_latency_ms) }} ms</dd></div>
+    <div><dt>Calls</dt><dd>{{ snap.call_count }}</dd></div>
+    <div><dt>Cost / correct answer</dt><dd>{{ correct_answer_cost }} <span class="muted">(naive: undefined)</span></dd></div>
+  </dl>
+  <h4>By phase</h4>
+  <ul>
+    {% for name, cost in (snap.by_phase or {}).items() %}
+      <li>{{ name }} <span>{{ cost | usd }}</span></li>
+    {% else %}
+      <li class="muted">no phase spend yet</li>
+    {% endfor %}
+  </ul>
+  <h4>By model</h4>
+  <ul>
+    {% for name, cost in (snap.by_model or {}).items() %}
+      <li>{{ name }} <span>{{ cost | usd }}</span></li>
+    {% else %}
+      <li class="muted">no model spend yet</li>
+    {% endfor %}
+  </ul>
+</div>

@@ -1,0 +1,8 @@
+<div class="flash ok">
+  Ingested {{ result.message_count }} messages
+  in {{ "%.1f"|format(result.duration_s) }}s
+  for {{ result.cost_usd | usd }}.
+  {% if progress %}
+    <span class="muted">{{ progress | join(" → ") }}</span>
+  {% endif %}
+</div>

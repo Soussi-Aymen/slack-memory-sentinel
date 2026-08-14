@@ -1,0 +1,50 @@
+<div class="compare">
+  <p class="query-echo">Query: <em>{{ query }}</em></p>
+  <div class="panels">
+    <article class="panel naive">
+      <h3>Naive Vector Search</h3>
+      <p class="cost">cost {{ naive.cost_usd | usd }} · {{ "%.0f"|format(naive.latency_ms) }} ms</p>
+      {% if naive.error %}
+        <p class="panel-error">{{ naive.error }}</p>
+      {% elif not naive.results %}
+        <p class="hint">No hits.</p>
+      {% else %}
+        <ol>
+          {% for hit in naive.results %}
+            <li class="slack-msg">
+              <header>
+                <span class="chip">#{{ hit.channel }}</span>
+                <strong>{{ hit.user }}</strong>
+                <span class="score">cos {{ "%.3f"|format(hit.score) }}</span>
+              </header>
+              <p>{{ hit.text }}</p>
+            </li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    </article>
+
+    <article class="panel graph">
+      <h3>ContextDrift Memory Sentinel</h3>
+      <p class="cost">cost {{ graph.cost_usd | usd }} · {{ "%.0f"|format(graph.latency_ms) }} ms</p>
+      {% if graph.error %}
+        <p class="panel-error">{{ graph.error }}</p>
+      {% else %}
+        <div class="answer">{{ graph.graph_answer }}</div>
+        <h4>Provenance</h4>
+        <ul class="chips">
+          {% for chunk in graph.evidence_chunks %}
+            <li class="slack-msg">
+              <header>
+                <span class="chip">#{{ chunk.channel }}</span>
+                <strong>{{ chunk.user }}</strong>
+                <time>{{ chunk.timestamp }}</time>
+              </header>
+              <p>{{ chunk.text }}</p>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </article>
+  </div>
+</div>
