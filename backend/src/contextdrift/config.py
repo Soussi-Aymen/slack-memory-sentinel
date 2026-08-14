@@ -69,6 +69,7 @@ def configure_cognee() -> None:
     cognee.config.set_vector_db_config(
         {
             "vector_db_provider": "qdrant",
+            "vector_dataset_database_handler": "qdrant",
             "vector_db_url": settings.vector_db_url,
             "vector_db_key": os.environ.get("VECTOR_DB_KEY", ""),
         }
@@ -76,3 +77,9 @@ def configure_cognee() -> None:
     cognee.config.set_llm_model(settings.llm_model)
     cognee.config.set_embedding_model(settings.embedding_model)
     cognee.config.set_embedding_dimensions(1536)
+
+    # Cognee's LLM client reads llm_api_key, not OPENAI_API_KEY.
+    api_key = (os.environ.get("LLM_API_KEY") or os.environ.get("OPENAI_API_KEY") or "").strip()
+    if api_key:
+        cognee.config.set_llm_api_key(api_key)
+        cognee.config.set_embedding_api_key(api_key)
