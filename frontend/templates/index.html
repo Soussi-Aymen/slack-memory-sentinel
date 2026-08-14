@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ContextDrift — Slack Memory Sentinel</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="hash">#</span>
+      <div>
+        <h1>ContextDrift</h1>
+        <p>cross-channel Slack memory sentinel</p>
+      </div>
+    </div>
+    <div class="status-strip">
+      <span class="pill {% if status.qdrant %}ok{% else %}bad{% endif %}">Qdrant {% if status.qdrant %}up{% else %}down{% endif %}</span>
+      <span class="pill {% if status.cognee %}ok{% else %}bad{% endif %}">Cognee {% if status.cognee %}configured{% else %}unconfigured{% endif %}</span>
+      <span class="pill {% if status.api_key %}ok{% else %}bad{% endif %}">API key {% if status.api_key %}present{% else %}missing{% endif %}</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <h2>Channels</h2>
+      <div class="channel-preview">
+        {% set ns = namespace(last="") %}
+        {% for msg in messages %}
+          {% if msg.channel != ns.last %}
+            <div class="channel">#{{ msg.channel }}</div>
+            {% set ns.last = msg.channel %}
+          {% endif %}
+          <article class="slack-msg">
+            <header>
+              <strong>{{ msg.user }}</strong>
+              <time>{{ msg.timestamp }}</time>
+            </header>
+            <p>{{ msg.text }}</p>
+          </article>
+        {% endfor %}
+      </div>
+    </aside>
+
+    <section class="stage">
+      <form class="query-bar"
+            hx-post="/compare"
+            hx-target="#comparison"
+            hx-swap="innerHTML"
+            hx-indicator="#compare-busy">
+        <label>
+          Preset
+          <select name="preset" id="preset">
+            {% for key, text in presets %}
+              <option value="{{ text }}" {% if loop.first %}selected{% endif %}>{{ text }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="grow">
+          Custom query
+          <input type="text" name="query" id="query" placeholder="{{ default_query }}" autocomplete="off">
+        </label>
+        <button type="submit">Compare</button>
+      </form>
+
+      <div class="toolbar">
+        <button type="button"
+                hx-post="/ingest"
+                hx-target="#ingest-status"
+                hx-swap="innerHTML"
+                hx-indicator="#ingest-busy">
+          Ingest corpus
+        </button>
+        <span id="ingest-busy" class="htmx-indicator">ingesting…</span>
+        <span id="compare-busy" class="htmx-indicator">searching both panels…</span>
+      </div>
+      <div id="ingest-status"></div>
+      <div id="comparison">
+        <p class="hint">Pick a preset (or type a custom query) and compare naive cosine against graph memory.</p>
+      </div>
+    </section>
+
+    <aside class="monitor">
+      <h2>Live cost</h2>
+      <div id="metrics"
+           hx-get="/metrics"
+           hx-trigger="load, every 2s"
+           hx-swap="innerHTML">
+        <p class="hint">polling every 2s…</p>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>
