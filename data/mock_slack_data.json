@@ -1,0 +1,74 @@
+[
+  {
+    "channel": "incident-alerts",
+    "user": "@alex",
+    "timestamp": "2026-08-11T09:14:03Z",
+    "text": "P1: checkout is returning 504s. This is a customer-facing bug, ticket CHECKOUT-504. Confirm-page requests die before the payment callback. Nobody has fixed it yet — checkout is still down."
+  },
+  {
+    "channel": "incident-alerts",
+    "user": "@priya",
+    "timestamp": "2026-08-11T09:16:41Z",
+    "text": "Ack CHECKOUT-504, pulling logs now. Paging @sarah on the payments path."
+  },
+  {
+    "channel": "backend-dev",
+    "user": "@sarah",
+    "timestamp": "2026-08-11T10:02:18Z",
+    "text": "CHECKOUT-504 root cause: fraud checks run synchronously on the confirm path and exhaust the request deadline. Moving them onto an async queue worker so the HTTP handler returns immediately."
+  },
+  {
+    "channel": "backend-dev",
+    "user": "@marcus",
+    "timestamp": "2026-08-11T11:47:55Z",
+    "text": "I'm blocking the release, rolling back to sync checks. Not comfortable shipping the queue worker without a longer soak."
+  },
+  {
+    "channel": "backend-dev",
+    "user": "@sarah",
+    "timestamp": "2026-08-11T14:21:09Z",
+    "text": "Override: we are not rolling back. Async worker p95 is 40ms against 900ms sync — benchmarks in the thread. We ship the queue path, not the rollback."
+  },
+  {
+    "channel": "backend-dev",
+    "user": "@tom",
+    "timestamp": "2026-08-11T16:12:44Z",
+    "text": "Inventory cache PR is ready for review. TTL bumped to 90s, hit rate looks stable in staging."
+  },
+  {
+    "channel": "releases",
+    "user": "@jordan",
+    "timestamp": "2026-08-12T08:05:33Z",
+    "text": "Hotfix PR #405 merged and rolled out. Queued worker is live on every payment node. Deploy green, SLO back within budget."
+  },
+  {
+    "channel": "general",
+    "user": "@maya",
+    "timestamp": "2026-08-12T09:30:12Z",
+    "text": "504 gateway timeout on the marketing site. The landing-page CDN is serving stale error pages. Completely unrelated to payments."
+  },
+  {
+    "channel": "general",
+    "user": "@lee",
+    "timestamp": "2026-08-12T12:15:08Z",
+    "text": "New coffee machine is live on 4. Please rinse the portafilter or facilities will hunt you."
+  },
+  {
+    "channel": "general",
+    "user": "@lee",
+    "timestamp": "2026-08-13T08:20:51Z",
+    "text": "Office wifi is flaky again on 3. IT is swapping the AP after lunch."
+  },
+  {
+    "channel": "random",
+    "user": "@sam",
+    "timestamp": "2026-08-11T13:00:19Z",
+    "text": "The office cat just walked across my keyboard and opened 14 tabs. I am calling that a stand-up update."
+  },
+  {
+    "channel": "random",
+    "user": "@nina",
+    "timestamp": "2026-08-12T11:45:02Z",
+    "text": "Lunch poll: dumplings or the sandwich cart? React with one dumpling or two sandwiches."
+  }
+]
