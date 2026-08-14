@@ -10,6 +10,8 @@ It also detects **drift** — decisions that vector search still ranks highly bu
 
 ## Architecture
 
+![ContextDrift architecture: htmx browser, FastAPI + Cognee in Docker, Qdrant, and OpenAI](docs/architecture.png)
+
 ```mermaid
 flowchart LR
   Data["data/mock_slack_data.json<br/>12 adversarial messages"] --> Ingest["ingest.py<br/>remember(list)"]
