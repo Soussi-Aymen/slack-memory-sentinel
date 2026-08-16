@@ -6,7 +6,7 @@ ContextDrift builds a typed knowledge graph over Slack history with [Cognee](htt
 
 It also detects **drift** — decisions that vector search still ranks highly but that were later reversed. A blocker from three hours ago is not current state, and a memory layer that cannot tell the difference will confidently hand you a stale answer.
 
-![ContextDrift comparing naive Qdrant vector search against Cognee knowledge-graph recall, with live cost per query](docs/screenshot.png)
+![ContextDrift analysis console: ingest, compare naive cosine vs graph recall, and a live cost panel by phase and model](docs/screenshot.png)
 
 ## Architecture
 
@@ -35,8 +35,8 @@ The corpus is Slack-shaped (`data/mock_slack_data.json`, 12 messages). Answers a
 ```mermaid
 flowchart LR
   subgraph compose [docker compose]
-    Backend["backend :8000<br/>uvicorn --reload"]
-    QdrantSvc["qdrant :6333"]
+    Backend["backend :8000<br/>uid 1000, cap_drop ALL"]
+    QdrantSvc["qdrant v1.19.0-unprivileged<br/>internal :6333"]
   end
   Backend -->|"http://qdrant:6333"| QdrantSvc
   QdrantSvc -.->|bind mount| Storage["./qdrant_storage"]
@@ -45,7 +45,7 @@ flowchart LR
   Backend -.->|named volumes| Vols["cognee_system<br/>cognee_data"]
 ```
 
-Inside the backend container Qdrant is `http://qdrant:6333`, not `localhost`. `.env.example` ships `VECTOR_DB_URL=http://qdrant:6333` for the containerized path, with a commented `http://localhost:6333` for host-side runs. A wrong value here surfaces as an adapter error and reads like a Cognee bug.
+Both services drop Linux capabilities and run as uid 1000. The backend image starts as root only long enough to chown the named volumes, then `setpriv` to `app`. Qdrant is `qdrant/qdrant:v1.19.0-unprivileged` with a read-only rootfs; **6333/6334 are not published** — the backend reaches it as `http://qdrant:6333` on the compose network. LanceDB/pyarrow are omitted from the backend image (we use Qdrant). The runtime image still includes uv so `docker compose run --rm backend uv run pytest` works.
 
 ## Quickstart
 
@@ -63,7 +63,26 @@ docker compose up --build
 
 Open [http://localhost:8000](http://localhost:8000). Click **Ingest corpus**, wait for the one-shot `remember()` pipeline to finish, then **Compare** on the preset query `was the checkout 504 bug fixed?`.
 
-Native Slack (optional): copy `slack-app-manifest.yml`, replace `YOUR_NGROK_HOST`, create the app at api.slack.com, fill the `SLACK_*` keys in `.env`, run `ngrok http 8000`, then open [http://localhost:8000/integrations](http://localhost:8000/integrations) and **Connect Slack**. In the workspace run `/cognee-link`, then `/cognee-ask was the checkout 504 bug fixed?`.
+The app healthcheck is [http://localhost:8000/health](http://localhost:8000/health).
+
+## Connect Slack (native `/cognee-ask`)
+
+The FastAPI app already mounts Cognee's official Slack routes. You do not write a bot. You create a Slack app, put its secrets in `.env`, tunnel port 8000, and click **Connect Slack**.
+
+| What you need | Where it comes from |
+|---|---|
+| ngrok | [ngrok.com/download](https://ngrok.com/download) — run `ngrok http 8000`, copy the `*.ngrok-free.app` host |
+| Slack app | [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From an app manifest** → paste `slack-app-manifest.yml` (after replacing `YOUR_NGROK_HOST`) |
+| `SLACK_CLIENT_ID` | that app → **Basic Information** → App Credentials → Client ID |
+| `SLACK_CLIENT_SECRET` | same page → Client Secret (Show) |
+| `SLACK_SIGNING_SECRET` | same page → Signing Secret (Show) |
+| `SLACK_REDIRECT_URI` | `https://<ngrok-host>/api/v1/integrations/slack/callback` |
+| `SLACK_FRONTEND_BASE_URL` | `http://localhost:8000` — not ngrok |
+| `INTEGRATION_CREDENTIALS_KEY` | generate locally: `python3 -c "import os,base64; print(base64.b64encode(os.urandom(32)).decode())"` |
+
+Then: restart the backend → [http://localhost:8000/integrations](http://localhost:8000/integrations) (every pill **set**) → **Connect Slack** → in the workspace `/cognee-link`, then `/cognee-ask was the checkout 504 bug fixed?`.
+
+The click-by-click version is the comment block at the top of `slack-app-manifest.yml`.
 
 Optional CLI ingest (same pipeline, no UI):
 
@@ -71,11 +90,9 @@ Optional CLI ingest (same pipeline, no UI):
 docker compose run --rm backend uv run python -m contextdrift.ingest
 ```
 
-Qdrant answers on [http://localhost:6333/readyz](http://localhost:6333/readyz). The app healthcheck is [http://localhost:8000/health](http://localhost:8000/health).
-
 ## Why the baseline is a real Qdrant query
 
-The left panel is not a simulated straw man. `naive.py` embeds the query with `text-embedding-3-small` and hits the same Qdrant `DocumentChunk_text` collection Cognee wrote during ingest, returning cosine top-3 with scores.
+The left panel is not a simulated straw man. `naive.py` embeds the query with `text-embedding-3-small` and hits the same Qdrant `DocumentChunk_text` collection Cognee wrote during ingest, returning cosine top-3 with scores. That collection stores a **named** vector `text`; Qdrant 1.19 rejects `query_points` without `using="text"` (`Not existing vector name error: ""`).
 
 Graph traversal is the only variable: both panels share the collection and the embedding model. The adversarial corpus is built so lexical overlap points at the incident report, a marketing-site 504 decoy, and a superseded blocker — never at the lexically disjoint hotfix in `#releases`.
 
@@ -85,7 +102,17 @@ Every Cognee LLM call routes through LiteLLM. `metrics.py` registers a `CustomLo
 
 The number that sells the pitch is **cost per correct answer** — undefined for the baseline, because its numerator is zero. Panels show absolute spend per query side by side, plus the one-time ingest cost. Qdrant is self-hosted, so retrieval is $0 marginal and 100% of spend is LLM tokens.
 
-The monitor fragment at `GET /metrics` is polled every 2s via `hx-trigger`.
+The monitor fragment at `GET /metrics` is polled every 2s via `hx-trigger`. There is no separate cost dashboard and no LangSmith — the same in-process tracker feeds the console. Slack is for `/cognee-ask`, not a 2s poll.
+
+## Tests
+
+```bash
+docker compose run --rm backend uv run pytest -q \
+  tests/test_naive.py tests/test_search.py tests/test_web.py \
+  tests/test_config.py tests/test_ingest.py tests/test_integration.py
+```
+
+Unit tests mock Qdrant and the LLM (positive hits, missing collection, named-vector 400 captured, Slack placeholder env, empty ingest). `tests/test_integration.py` hits the live Qdrant on the compose network and skips if `/readyz` is down.
 
 ## 2-minute demo script
 
@@ -107,3 +134,4 @@ If asked why the Qdrant adapter declared `cognee==1.4.2`: a declared pin is not 
 
 - **LangChain / LangGraph / LangSmith.** Cognee already owns orchestration; a state machine around a single `recall()` adds no signal. LiteLLM already yields model, tokens, cost, and latency, so LangSmith would duplicate the callback with an extra API key and network dependency.
 - **Loaders** for Jira and the codebase — the graph and cost tracker stay the same.
+- **Multi-stage backend image** to drop the uv binary after install (~50MB). Dev deps (`ruff`, `pytest`) stay in this image so the compose test command keeps working.
