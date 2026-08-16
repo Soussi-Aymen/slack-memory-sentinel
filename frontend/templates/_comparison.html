@@ -9,11 +9,11 @@
       {% elif not naive.results %}
         <p class="hint">No hits.</p>
       {% else %}
-        <ol>
+        <ol class="hits">
           {% for hit in naive.results %}
-            <li class="slack-msg">
+            <li class="hit">
               <header>
-                <span class="chip">#{{ hit.channel }}</span>
+                <span class="chip">{{ hit.channel }}</span>
                 <strong>{{ hit.user }}</strong>
                 <span class="score">cos {{ "%.3f"|format(hit.score) }}</span>
               </header>
@@ -32,11 +32,11 @@
       {% else %}
         <div class="answer">{{ graph.graph_answer }}</div>
         <h4>Provenance</h4>
-        <ul class="chips">
+        <ul class="hits">
           {% for chunk in graph.evidence_chunks %}
-            <li class="slack-msg">
+            <li class="hit">
               <header>
-                <span class="chip">#{{ chunk.channel }}</span>
+                <span class="chip">{{ chunk.channel }}</span>
                 <strong>{{ chunk.user }}</strong>
                 <time>{{ chunk.timestamp }}</time>
               </header>

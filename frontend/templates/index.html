@@ -3,19 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ContextDrift — Slack Memory Sentinel</title>
+  <title>ContextDrift — analysis console</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="hash">#</span>
       <div>
         <h1>ContextDrift</h1>
-        <p>cross-channel Slack memory sentinel</p>
+        <p>knowledge-graph recall vs naive vector search</p>
       </div>
     </div>
+    <nav class="nav">
+      <a href="/">Console</a>
+      <a href="/integrations">Slack</a>
+    </nav>
     <div class="status-strip">
       <span class="pill {% if status.qdrant %}ok{% else %}bad{% endif %}">Qdrant {% if status.qdrant %}up{% else %}down{% endif %}</span>
       <span class="pill {% if status.cognee %}ok{% else %}bad{% endif %}">Cognee {% if status.cognee %}configured{% else %}unconfigured{% endif %}</span>
@@ -24,26 +27,6 @@
   </header>
 
   <main class="layout">
-    <aside class="sidebar">
-      <h2>Channels</h2>
-      <div class="channel-preview">
-        {% set ns = namespace(last="") %}
-        {% for msg in messages %}
-          {% if msg.channel != ns.last %}
-            <div class="channel">#{{ msg.channel }}</div>
-            {% set ns.last = msg.channel %}
-          {% endif %}
-          <article class="slack-msg">
-            <header>
-              <strong>{{ msg.user }}</strong>
-              <time>{{ msg.timestamp }}</time>
-            </header>
-            <p>{{ msg.text }}</p>
-          </article>
-        {% endfor %}
-      </div>
-    </aside>
-
     <section class="stage">
       <form class="query-bar"
             hx-post="/compare"

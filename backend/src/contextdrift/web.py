@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from functools import wraps
@@ -13,7 +12,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.responses import Response
@@ -37,14 +36,6 @@ def _frontend_root() -> Path:
     if (container / "templates").is_dir():
         return container
     return Path(__file__).resolve().parents[3] / "frontend"
-
-
-def _load_corpus() -> list[dict[str, Any]]:
-    path = Path(settings.data_path)
-    if not path.is_file():
-        return []
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    return payload if isinstance(payload, list) else []
 
 
 def qdrant_reachable() -> bool:
@@ -84,6 +75,32 @@ def _correct_answer_cost(snap: dict[str, Any]) -> str:
     return _usd(graph)
 
 
+async def run_startup() -> None:
+    """Register Cognee settings and apply 1.5 schema migrations.
+
+    Tests monkeypatch this so the htmx shell never touches sqlite or Qdrant.
+    """
+    configure_cognee()
+    from cognee.run_migrations import run_migrations
+
+    await run_migrations()
+
+
+def _mount_slack_routes(app: FastAPI) -> None:
+    """Official Cognee Slack + OAuth routers (1.5.0.dev1)."""
+    import cognee.modules.integrations.slack  # noqa: F401 — registers SlackIntegration
+    from cognee.api.v1.integrations.routers import get_integrations_router
+    from cognee.api.v1.slack.routers import get_slack_channels_router, get_slack_router
+
+    app.include_router(get_slack_router(), prefix="/api/v1/slack", tags=["slack"])
+    app.include_router(get_slack_channels_router(), prefix="/api/v1/slack", tags=["slack"])
+    app.include_router(
+        get_integrations_router(),
+        prefix="/api/v1/integrations",
+        tags=["integrations"],
+    )
+
+
 def create_app() -> FastAPI:
     frontend = _frontend_root()
     templates = Jinja2Templates(directory=str(frontend / "templates"))
@@ -92,10 +109,12 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         register_metrics()
+        await run_startup()
         yield
 
     app = FastAPI(title="ContextDrift", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory=str(frontend / "static")), name="static")
+    _mount_slack_routes(app)
 
     def error_fragment(request: Request, exc: BaseException) -> HTMLResponse:
         return templates.TemplateResponse(
@@ -128,11 +147,35 @@ def create_app() -> FastAPI:
             "index.html",
             {
                 "status": _status(),
-                "messages": _load_corpus(),
                 "presets": PRESET_QUERIES,
                 "default_query": PRESET_QUERIES[0][1],
             },
         )
+
+    @app.get("/integrations", response_class=HTMLResponse)
+    @catch_errors
+    async def integrations(request: Request) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "integrations.html",
+            {
+                "status": _status(),
+                "slack_outcome": request.query_params.get("slack", ""),
+            },
+        )
+
+    @app.get("/slack/connect")
+    @catch_errors
+    async def slack_connect(request: Request) -> RedirectResponse:
+        from cognee.modules.integrations.oauth_flow import make_state
+        from cognee.modules.integrations.registry import get_integration
+        from cognee.modules.users.methods import get_default_user
+
+        configure_cognee()
+        integration = get_integration("slack")
+        user = await get_default_user()
+        state = make_state(user.id, signing_secret=integration.state_signing_secret())
+        return RedirectResponse(integration.authorize_url(state))
 
     @app.post("/compare", response_class=HTMLResponse)
     @catch_errors

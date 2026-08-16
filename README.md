@@ -28,7 +28,7 @@ flowchart LR
   Metrics --> Monitor["GET /metrics<br/>hx-trigger every 2s"]
 ```
 
-The corpus is Slack-shaped (`data/mock_slack_data.json`, 12 messages) and the htmx UI renders answers as Slack-styled messages. The official Cognee Slack app is not used: `cognee-community-vector-adapter-qdrant==0.4.0` pins `cognee==1.4.2`, and the Slack integration needs `>=1.5.0.dev1`.
+The corpus is Slack-shaped (`data/mock_slack_data.json`, 12 messages). Answers also land in Slack through Cognee's official app (`/cognee-ask`, `/cognee-remember`, `/cognee-link`) once the workspace is connected at `/integrations`. The Qdrant community adapter still declares `cognee==1.4.2`; a uv `override-dependencies` pin to `cognee==1.5.0.dev1` is what makes that official Slack stack available — empirically `register` + `remember` + `recall` round-trip on 1.5.0.dev1. Bulk channel history is still our ingest pipeline: the official app omits `channels:history`.
 
 ## Compose topology
 
@@ -62,6 +62,8 @@ docker compose up --build
 ```
 
 Open [http://localhost:8000](http://localhost:8000). Click **Ingest corpus**, wait for the one-shot `remember()` pipeline to finish, then **Compare** on the preset query `was the checkout 504 bug fixed?`.
+
+Native Slack (optional): copy `slack-app-manifest.yml`, replace `YOUR_NGROK_HOST`, create the app at api.slack.com, fill the `SLACK_*` keys in `.env`, run `ngrok http 8000`, then open [http://localhost:8000/integrations](http://localhost:8000/integrations) and **Connect Slack**. In the workspace run `/cognee-link`, then `/cognee-ask was the checkout 504 bug fixed?`.
 
 Optional CLI ingest (same pipeline, no UI):
 
@@ -99,10 +101,9 @@ Rehearse once with a timer. Bracketed values are filled from the live `/metrics`
 
 **1:50–2:00 — Close.** "Point it at Jira or your codebase and nothing changes but the loader. The memory layer is the product."
 
-If asked why not the official Cognee Slack app: the Qdrant community adapter pins `cognee==1.4.2` and the Slack integration needs `1.5.0.dev1` — we chose Qdrant.
+If asked why the Qdrant adapter declared `cognee==1.4.2`: a declared pin is not proof of incompatibility. We forced `cognee==1.5.0.dev1` with uv `override-dependencies` and verified `register` + `remember` + `recall` against a scratch Qdrant collection.
 
 ## Future work
 
 - **LangChain / LangGraph / LangSmith.** Cognee already owns orchestration; a state machine around a single `recall()` adds no signal. LiteLLM already yields model, tokens, cost, and latency, so LangSmith would duplicate the callback with an extra API key and network dependency.
-- **Official Cognee Slack app** once the Qdrant adapter moves off the `1.4.2` pin, plus a `POST /api/v1/slack/commands` endpoint behind ngrok.
 - **Loaders** for Jira and the codebase — the graph and cost tracker stay the same.

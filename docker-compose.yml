@@ -28,6 +28,10 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      # Must be set before Cognee imports: 1.5 defaults to multi-tenant auth,
+      # which would hide the existing single-user "slack" dataset.
+      ENABLE_BACKEND_ACCESS_CONTROL: "false"
     volumes:
       - ./backend/src:/app/src
       - ./backend/tests:/app/tests
