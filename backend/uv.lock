@@ -2,6 +2,9 @@ version = 1
 revision = 3
 requires-python = "==3.12.*"
 
+[manifest]
+overrides = [{ name = "cognee", specifier = "==1.5.0.dev1" }]
+
 [[package]]
 name = "aiofiles"
 version = "25.1.0"
@@ -346,7 +349,7 @@ wheels = [
 
 [[package]]
 name = "cognee"
-version = "1.4.2"
+version = "1.5.0.dev1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -366,7 +369,7 @@ dependencies = [
     { name = "gunicorn" },
     { name = "instructor" },
     { name = "jinja2" },
-    { name = "ladybug" },
+    { name = "ladybug", marker = "platform_release >= '24.' or sys_platform != 'darwin'" },
     { name = "lancedb" },
     { name = "langdetect" },
     { name = "limits" },
@@ -394,9 +397,9 @@ dependencies = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/06/cf0da41e9dbe28f4d1c8f1f8c3d0e4fbc224fe9f1a281e9a189fdfac5ba4/cognee-1.4.2.tar.gz", hash = "sha256:ca94b26d674c66ad11bdf4bde24881f7b6a6044bdc029cf673c79a6f07f2631f", size = 27031477, upload-time = "2026-08-08T18:02:32.632Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/4b/f568499c8e9090554f780bac1cdab4d9aa762ade7c980f72fa69fc1b5344/cognee-1.5.0.dev1.tar.gz", hash = "sha256:f86442caea7f9b78d4c0798465f06f9fa56924949140b25818e95a4ee8ab72f1", size = 27417569, upload-time = "2026-08-14T14:28:10.73Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a6/c7/f3c62c5c872314bb24fa6a81a0e8987ac313655e0e4c41b1ba8f703092eb/cognee-1.4.2-py3-none-any.whl", hash = "sha256:8fd91bed9ec87155970d5c3d79996701076bfedb87bf1a1f056a18e857a1f57d", size = 7496972, upload-time = "2026-08-08T18:02:29.899Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/1f/4f4947475d9372421f64d6837d2d49569e7ebe4ca8b404dee874154d92f8/cognee-1.5.0.dev1-py3-none-any.whl", hash = "sha256:612060bc6cc91e19c9ba72c1eb4066bb06c197dc086127fe720ee93267664c39", size = 7924591, upload-time = "2026-08-14T14:28:07.985Z" },
 ]
 
 [[package]]
@@ -450,7 +453,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cognee", specifier = "==1.4.2" },
+    { name = "cognee", specifier = "==1.5.0.dev1" },
     { name = "cognee-community-vector-adapter-qdrant", specifier = "==0.4.0" },
     { name = "fastapi" },
     { name = "jinja2" },

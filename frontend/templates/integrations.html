@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ContextDrift — Slack connection</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div>
+        <h1>ContextDrift</h1>
+        <p>Slack workspace connection</p>
+      </div>
+    </div>
+    <nav class="nav">
+      <a href="/">Console</a>
+      <a href="/integrations">Slack</a>
+    </nav>
+    <div class="status-strip">
+      <span class="pill {% if status.qdrant %}ok{% else %}bad{% endif %}">Qdrant {% if status.qdrant %}up{% else %}down{% endif %}</span>
+      <span class="pill {% if status.cognee %}ok{% else %}bad{% endif %}">Cognee {% if status.cognee %}configured{% else %}unconfigured{% endif %}</span>
+      <span class="pill {% if status.api_key %}ok{% else %}bad{% endif %}">API key {% if status.api_key %}present{% else %}missing{% endif %}</span>
+    </div>
+  </header>
+
+  <main class="stage integrations">
+    {% if slack_outcome == "connected" %}
+      <div class="flash ok">Slack workspace connected. In Slack, run <code>/cognee-link</code> then <code>/cognee-ask was the checkout 504 bug fixed?</code></div>
+    {% elif slack_outcome == "cancelled" %}
+      <div class="flash error">Slack install was cancelled.</div>
+    {% elif slack_outcome.startswith("error") %}
+      <div class="flash error">Slack install failed ({{ slack_outcome }}).</div>
+    {% endif %}
+
+    <article class="panel">
+      <h2>Official Cognee Slack app</h2>
+      <p>Connect a scratch workspace so <code>/cognee-ask</code>, <code>/cognee-remember</code>, and the Remember this shortcut hit this backend through ngrok.</p>
+      <p>Create the app from <code>slack-app-manifest.yml</code>, fill the <code>SLACK_*</code> keys in <code>.env</code>, expose port 8000 with ngrok, then:</p>
+      <p><a class="button" href="/slack/connect">Connect Slack</a></p>
+      <p class="hint">Bulk channel history is not part of the official integration (no <code>channels:history</code> scope). The corpus ingest pipeline is unchanged.</p>
+    </article>
+  </main>
+</body>
+</html>

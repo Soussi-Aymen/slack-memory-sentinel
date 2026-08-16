@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Cross-channel Slack memory sentinel on Cognee's knowledge graph and Qdrant vector search"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    # Exact pin: cognee-community-vector-adapter-qdrant 0.4.0 declares cognee==1.4.2.
-    "cognee==1.4.2",
+    # Adapter 0.4.0 still declares cognee==1.4.2. Empirically it round-trips
+    # remember/recall on 1.5.0.dev1 (VectorDBInterface and registration hooks
+    # survived). The uv override below is what defeats the declared pin.
+    "cognee==1.5.0.dev1",
     "cognee-community-vector-adapter-qdrant==0.4.0",
     "qdrant-client>=1.19.0",
     # The upper bound matters: cognee asks for openai>=1.80.1 unbounded, which lets
@@ -30,6 +32,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv]
+override-dependencies = ["cognee==1.5.0.dev1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/contextdrift"]

@@ -21,11 +21,16 @@ async def _unused_search(_query: str, top_k: int = 3):
     raise AssertionError("search must not run in shell tests")
 
 
+async def _noop_startup() -> None:
+    return None
+
+
 def _client(monkeypatch) -> TestClient:
     monkeypatch.setattr("contextdrift.web.qdrant_reachable", lambda: True)
     monkeypatch.setattr("contextdrift.web.cognee_configured", lambda: True)
     monkeypatch.setattr("contextdrift.web.has_api_key", lambda: True)
     monkeypatch.setattr("contextdrift.web.register_metrics", lambda: None)
+    monkeypatch.setattr("contextdrift.web.run_startup", _noop_startup)
     monkeypatch.setattr("contextdrift.web.snapshot", lambda: EMPTY_SNAP)
     monkeypatch.setattr("contextdrift.web.naive_vector_search", _unused_search)
     monkeypatch.setattr("contextdrift.web.query_slack_memory", _unused_search)
@@ -55,6 +60,9 @@ def test_index_renders_status_and_presets(monkeypatch):
     assert 'src="/static/htmx.min.js"' in body
     assert "cdn.jsdelivr" not in body
     assert "unpkg.com" not in body
+    assert "channel-preview" not in body
+    assert "slack-msg" not in body
+    assert "analysis console" in body.lower() or "knowledge-graph recall" in body
 
 
 def test_metrics_fragment(monkeypatch):
@@ -72,6 +80,7 @@ def test_metrics_fragment(monkeypatch):
     monkeypatch.setattr("contextdrift.web.cognee_configured", lambda: True)
     monkeypatch.setattr("contextdrift.web.has_api_key", lambda: True)
     monkeypatch.setattr("contextdrift.web.register_metrics", lambda: None)
+    monkeypatch.setattr("contextdrift.web.run_startup", _noop_startup)
     monkeypatch.setattr("contextdrift.web.snapshot", lambda: snap)
     monkeypatch.setattr("contextdrift.web.naive_vector_search", _unused_search)
     monkeypatch.setattr("contextdrift.web.query_slack_memory", _unused_search)
@@ -85,3 +94,18 @@ def test_metrics_fragment(monkeypatch):
     assert "gpt-4o-mini" in body
     assert "undefined" in body
     assert 'hx-trigger="every 2s"' in body
+
+
+def test_integrations_page(monkeypatch):
+    with _client(monkeypatch) as client:
+        response = client.get("/integrations")
+    assert response.status_code == 200
+    assert "Connect Slack" in response.text
+    assert "/slack/connect" in response.text
+
+
+def test_slack_commands_route_is_mounted(monkeypatch):
+    with _client(monkeypatch) as client:
+        response = client.post("/api/v1/slack/commands")
+    assert response.status_code != 404
+    assert response.status_code in (401, 422, 500)
