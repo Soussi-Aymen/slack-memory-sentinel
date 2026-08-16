@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from functools import wraps
@@ -28,7 +29,32 @@ PRESET_QUERIES = (
     ("release-blocked", "is the checkout release still blocked?"),
 )
 
+SLACK_ENV_KEYS = (
+    "SLACK_CLIENT_ID",
+    "SLACK_CLIENT_SECRET",
+    "SLACK_SIGNING_SECRET",
+    "SLACK_REDIRECT_URI",
+    "SLACK_FRONTEND_BASE_URL",
+    "INTEGRATION_CREDENTIALS_KEY",
+)
+
 Handler = Callable[..., Awaitable[Response]]
+
+
+def _env_configured(name: str) -> bool:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return False
+    return "YOUR_NGROK" not in value and not value.endswith("_here")
+
+
+def slack_status() -> dict[str, bool]:
+    """Which Slack/OAuth env vars are set. Values are never returned."""
+    return {name: _env_configured(name) for name in SLACK_ENV_KEYS}
+
+
+def slack_ready() -> bool:
+    return all(slack_status().values())
 
 
 def _frontend_root() -> Path:
@@ -160,13 +186,30 @@ def create_app() -> FastAPI:
             "integrations.html",
             {
                 "status": _status(),
+                "slack_env": slack_status(),
+                "slack_ready": slack_ready(),
                 "slack_outcome": request.query_params.get("slack", ""),
             },
         )
 
     @app.get("/slack/connect")
     @catch_errors
-    async def slack_connect(request: Request) -> RedirectResponse:
+    async def slack_connect(request: Request) -> Response:
+        missing = [name for name, ok in slack_status().items() if not ok]
+        if missing:
+            return templates.TemplateResponse(
+                request,
+                "_error.html",
+                {
+                    "message": (
+                        "Slack is not configured. Paste Client ID, Client Secret, "
+                        "and Signing Secret from api.slack.com → your app → "
+                        "Basic Information into .env, set SLACK_REDIRECT_URI to "
+                        "the ngrok callback URL, then restart. Missing: " + ", ".join(missing)
+                    )
+                },
+                status_code=503,
+            )
         from cognee.modules.integrations.oauth_flow import make_state
         from cognee.modules.integrations.registry import get_integration
         from cognee.modules.users.methods import get_default_user

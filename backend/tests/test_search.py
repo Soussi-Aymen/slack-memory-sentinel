@@ -54,6 +54,8 @@ def test_parse_slack_prefix_without_provenance_keeps_raw_text():
         "user": "",
         "timestamp": "",
     }
+    assert parse_slack_prefix("") == {"text": "", "channel": "", "user": "", "timestamp": ""}
+    assert parse_slack_prefix(None)["text"] == ""  # type: ignore[arg-type]
 
 
 def test_unwrap_graph_answer_from_fabricated_recall_objects():
@@ -66,6 +68,9 @@ def test_unwrap_graph_answer_from_fabricated_recall_objects():
     assert unwrap_graph_answer(None) == ""
     assert unwrap_graph_answer([]) == ""
     assert unwrap_graph_answer([[SimpleNamespace(text="nested")]]) == "nested"
+    assert unwrap_graph_answer({"content": "from content key"}) == "from content key"
+    assert unwrap_graph_answer(SimpleNamespace(other="nope")) == ""
+    assert unwrap_graph_answer(0) == ""
 
 
 def test_unwrap_chunks_parses_prefix_from_mixed_shapes():
@@ -93,6 +98,8 @@ def test_unwrap_chunks_parses_prefix_from_mixed_shapes():
         "timestamp": "",
     }
     assert len(chunks) == 3
+    assert unwrap_chunks(None) == []
+    assert unwrap_chunks([]) == []
 
 
 @pytest.mark.asyncio
@@ -172,5 +179,21 @@ async def test_query_slack_memory_never_raises(monkeypatch):
 
     result = await query_slack_memory("anything")
     assert result["error"] == "vector adapter went sideways"
+    assert result["graph_answer"] == ""
+    assert result["evidence_chunks"] == []
+
+
+@pytest.mark.asyncio
+async def test_query_slack_memory_empty_recall_is_blank_not_an_error(monkeypatch):
+    async def fake_recall(*_args, **_kwargs):
+        return []
+
+    monkeypatch.setattr("contextdrift.search.configure_cognee", lambda: None)
+    monkeypatch.setattr("contextdrift.search.register_metrics", lambda: None)
+    monkeypatch.setattr("contextdrift.search.cost_since", lambda _mark: 0.0)
+    monkeypatch.setattr(cognee, "recall", fake_recall)
+
+    result = await query_slack_memory("was the checkout 504 bug fixed?")
+    assert result["error"] is None
     assert result["graph_answer"] == ""
     assert result["evidence_chunks"] == []

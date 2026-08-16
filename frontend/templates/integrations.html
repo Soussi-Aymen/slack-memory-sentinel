@@ -37,8 +37,20 @@
     <article class="panel">
       <h2>Official Cognee Slack app</h2>
       <p>Connect a scratch workspace so <code>/cognee-ask</code>, <code>/cognee-remember</code>, and the Remember this shortcut hit this backend through ngrok.</p>
-      <p>Create the app from <code>slack-app-manifest.yml</code>, fill the <code>SLACK_*</code> keys in <code>.env</code>, expose port 8000 with ngrok, then:</p>
-      <p><a class="button" href="/slack/connect">Connect Slack</a></p>
+      <h3>Env checklist</h3>
+      <ul class="hits">
+        {% for name, ok in slack_env.items() %}
+          <li class="hit">
+            <code>{{ name }}</code>
+            <span class="pill {% if ok %}ok{% else %}bad{% endif %}">{% if ok %}set{% else %}missing{% endif %}</span>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if slack_ready %}
+        <p><a class="button" href="/slack/connect">Connect Slack</a></p>
+      {% else %}
+        <p class="flash error">Slack is not configured. Follow the header in <code>slack-app-manifest.yml</code>: ngrok → create the app from the YAML at api.slack.com/apps → paste Client ID, Client Secret, and Signing Secret from Basic Information into <code>.env</code> → restart.</p>
+      {% endif %}
       <p class="hint">Bulk channel history is not part of the official integration (no <code>channels:history</code> scope). The corpus ingest pipeline is unchanged.</p>
     </article>
   </main>

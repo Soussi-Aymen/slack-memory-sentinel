@@ -11,6 +11,8 @@ from contextdrift.metrics import _current_phase
 from contextdrift.naive import (
     CHUNK_COLLECTION,
     INGEST_FIRST,
+    VECTOR_NAME,
+    _collection_names,
     find_chunk_collection,
     naive_vector_search,
     shape_results,
@@ -41,6 +43,7 @@ def test_find_chunk_collection_prefers_exact_name():
     assert find_chunk_collection(["slack_DocumentChunk_text"]) == "slack_DocumentChunk_text"
     assert find_chunk_collection(["Entity_name", "other"]) is None
     assert find_chunk_collection([]) is None
+    assert find_chunk_collection(["", "DocumentChunk_text_v2"]) == "DocumentChunk_text_v2"
 
 
 def test_shape_results_sorts_by_score_and_parses_prefix():
@@ -61,6 +64,38 @@ def test_shape_results_sorts_by_score_and_parses_prefix():
     assert shaped[1]["user"] == "@marcus"
     assert shaped[2]["channel"] == "general"
     assert "timestamp" not in shaped[0]
+
+
+def test_shape_results_empty_hits_and_content_payload_and_missing_score():
+    assert shape_results([]) == []
+    shaped = shape_results(
+        [
+            {"payload": {"content": "plain evidence"}, "score": None},
+            SimpleNamespace(payload=None, score=0.2),
+        ]
+    )
+    assert shaped[0]["score"] == pytest.approx(0.2)
+    assert shaped[0]["text"] == ""
+    assert shaped[1]["text"] == "plain evidence"
+    assert shaped[1]["score"] == 0.0
+    assert shaped[1]["channel"] == ""
+
+
+def test_collection_names_accepts_strings_dicts_and_skips_blank():
+    class _Mixed:
+        collections = [
+            "DocumentChunk_text",
+            SimpleNamespace(name="Entity_name"),
+            {"name": "TextSummary_text"},
+            {"name": ""},
+            SimpleNamespace(name=None),
+        ]
+
+    assert _collection_names(SimpleNamespace(get_collections=lambda: _Mixed())) == [
+        "DocumentChunk_text",
+        "Entity_name",
+        "TextSummary_text",
+    ]
 
 
 class _FakeCollections:
@@ -116,6 +151,7 @@ async def test_naive_vector_search_shapes_mocked_qdrant_hits(monkeypatch):
     assert phases == ["naive_embed"]
     assert client.queries[0]["collection_name"] == CHUNK_COLLECTION
     assert client.queries[0]["query"] == [0.1, 0.2, 0.3]
+    assert client.queries[0]["using"] == VECTOR_NAME
     assert client.queries[0]["limit"] == 3
 
 
@@ -152,3 +188,46 @@ async def test_naive_vector_search_never_raises(monkeypatch):
     result = await naive_vector_search("anything")
     assert result["error"] == "qdrant went sideways"
     assert result["results"] == []
+
+
+@pytest.mark.asyncio
+async def test_naive_vector_search_empty_points_is_no_hits_not_an_error(monkeypatch):
+    client = _FakeQdrant([CHUNK_COLLECTION], [])
+
+    async def fake_embed(_query: str) -> list[float]:
+        return [0.0] * 3
+
+    monkeypatch.setattr("contextdrift.naive.configure_cognee", lambda: None)
+    monkeypatch.setattr("contextdrift.naive.register_metrics", lambda: None)
+    monkeypatch.setattr("contextdrift.naive.cost_since", lambda _mark: 0.0)
+    monkeypatch.setattr("contextdrift.naive._qdrant_client", lambda: client)
+    monkeypatch.setattr("contextdrift.naive._embed_query", fake_embed)
+
+    result = await naive_vector_search("was the checkout 504 bug fixed?")
+    assert result["error"] is None
+    assert result["results"] == []
+    assert client.queries[0]["using"] == VECTOR_NAME
+
+
+@pytest.mark.asyncio
+async def test_naive_named_vector_400_is_captured_not_raised(monkeypatch):
+    class _NamedVectorClient(_FakeQdrant):
+        def query_points(self, **kwargs):
+            raise RuntimeError(
+                "Unexpected Response: 400 (Bad Request) Raw response content: "
+                'b\'{"status":{"error":"Wrong input: Not existing vector name error: "}}\''
+            )
+
+    client = _NamedVectorClient([CHUNK_COLLECTION], [])
+
+    async def fake_embed(_query: str) -> list[float]:
+        return [0.1, 0.2, 0.3]
+
+    monkeypatch.setattr("contextdrift.naive.configure_cognee", lambda: None)
+    monkeypatch.setattr("contextdrift.naive.register_metrics", lambda: None)
+    monkeypatch.setattr("contextdrift.naive._qdrant_client", lambda: client)
+    monkeypatch.setattr("contextdrift.naive._embed_query", fake_embed)
+
+    result = await naive_vector_search("was the checkout 504 bug fixed?")
+    assert result["results"] == []
+    assert "Not existing vector name" in (result["error"] or "")
