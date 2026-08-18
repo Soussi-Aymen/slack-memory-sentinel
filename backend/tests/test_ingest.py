@@ -79,3 +79,53 @@ async def test_run_ingestion_single_remember_and_return_keys(monkeypatch, tmp_pa
     assert "configured" in progress
     assert "reset" in progress
     assert "remembered" in progress
+
+
+@pytest.mark.asyncio
+async def test_run_ingestion_empty_corpus_still_remembers_an_empty_batch(monkeypatch, tmp_path):
+    data_file = tmp_path / "empty.json"
+    data_file.write_text("[]", encoding="utf-8")
+    monkeypatch.setenv("DATA_PATH", str(data_file))
+
+    remembered: dict[str, object] = {}
+
+    async def fake_forget(**kwargs):
+        return None
+
+    async def fake_prune_system(*, metadata=False, **kwargs):
+        return None
+
+    async def fake_remember(data, dataset_name=None):
+        remembered["data"] = data
+        remembered["dataset_name"] = dataset_name
+
+    monkeypatch.setattr("contextdrift.ingest.configure_cognee", lambda: None)
+    monkeypatch.setattr("contextdrift.ingest.register_metrics", lambda: None)
+    monkeypatch.setattr("contextdrift.ingest.cost_since", lambda _mark: 0.0)
+    monkeypatch.setattr(cognee, "forget", fake_forget)
+    monkeypatch.setattr(cognee.prune, "prune_system", fake_prune_system)
+    monkeypatch.setattr(cognee, "remember", fake_remember)
+
+    result = await run_ingestion()
+    assert result["message_count"] == 0
+    assert remembered["data"] == []
+    assert remembered["dataset_name"] == "slack"
+
+
+@pytest.mark.asyncio
+async def test_run_ingestion_missing_file_raises(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATA_PATH", str(tmp_path / "missing.json"))
+    monkeypatch.setattr("contextdrift.ingest.configure_cognee", lambda: None)
+    monkeypatch.setattr("contextdrift.ingest.register_metrics", lambda: None)
+
+    async def fake_forget(**kwargs):
+        return None
+
+    async def fake_prune_system(*, metadata=False, **kwargs):
+        return None
+
+    monkeypatch.setattr(cognee, "forget", fake_forget)
+    monkeypatch.setattr(cognee.prune, "prune_system", fake_prune_system)
+
+    with pytest.raises(FileNotFoundError):
+        await run_ingestion()

@@ -25,6 +25,8 @@ def test_has_api_key_rejects_placeholder(monkeypatch):
     assert has_api_key() is True
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     assert has_api_key() is False
+    monkeypatch.setenv("OPENAI_API_KEY", "   ")
+    assert has_api_key() is False
 
 
 def test_configure_cognee_is_safely_callable_twice(monkeypatch):

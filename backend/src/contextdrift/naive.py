@@ -10,6 +10,9 @@ from contextdrift.metrics import cost_since, marker, phase, register_metrics
 from contextdrift.search import parse_slack_prefix
 
 CHUNK_COLLECTION = "DocumentChunk_text"
+# Cognee's Qdrant adapter stores a named vector. Qdrant 1.19 rejects query_points
+# with an empty name (``Not existing vector name error: ""``).
+VECTOR_NAME = "text"
 INGEST_FIRST = "No memory yet — ingest the Slack corpus first."
 
 
@@ -90,6 +93,7 @@ def _query_hits(client: Any, collection: str, vector: list[float], top_k: int) -
     response = client.query_points(
         collection_name=collection,
         query=vector,
+        using=VECTOR_NAME,
         limit=top_k,
         with_payload=True,
     )
