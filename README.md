@@ -112,7 +112,7 @@ docker compose run --rm backend uv run pytest -q \
   tests/test_config.py tests/test_ingest.py tests/test_integration.py
 ```
 
-Unit tests mock Qdrant and the LLM (positive hits, missing collection, named-vector 400 captured, Slack placeholder env, empty ingest). `tests/test_integration.py` hits the live Qdrant on the compose network and skips if `/readyz` is down.
+Unit tests mock Qdrant and the LLM (positive hits, missing collection, named-vector 400 captured, Slack placeholder env, empty ingest). `tests/test_integration.py` hits the live Qdrant on the compose network and skips if `/readyz` is down. pytest-xdist runs 2 workers (Cognee import makes `-n auto` slower). Pass `-n0` for a single process.
 
 ## 2-minute demo script
 
